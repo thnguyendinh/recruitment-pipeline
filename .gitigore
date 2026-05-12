@@ -1,0 +1,12 @@
+jars/
+jarss/
+*.log
+__pycache__/
+*.pyc
+*.csv
+last_timestamp.txt
+/var/log
+*.pyo
+*.csv
+.env
+eof

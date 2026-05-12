@@ -1,0 +1,51 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    mem_limit: 200m
+    volumes:
+      - mongodb-data:/data/db
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: warehouse
+    ports:
+      - "3306:3306"
+    mem_limit: 200m
+
+  spark:
+    image: apache/spark:3.5.4-scala2.12-java11-python3-ubuntu
+    container_name: spark
+    restart: unless-stopped
+    user: root
+    command: tail -f /dev/null
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./scripts:/opt/spark/scripts
+      - ./jars:/opt/spark/extra-jars
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    mem_limit: 150m
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  mongodb-data:
