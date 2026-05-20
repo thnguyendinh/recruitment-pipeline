@@ -1,102 +1,82 @@
-## 📄 README.md
+### *RECRUITMENT PIPELINE*
+
+![Architecture](recu-realtime.png)
+
+> *Near-realtime pipeline xử lý dữ liệu tuyển dụng
+```markdown
+# Real-time Data Engineering Pipeline - Recruitment Platform
+
+##  Mô tả dự án
+Hệ thống pipeline xử lý dữ liệu **Near Real-time** cho nền tảng tuyển dụng. Thu thập dữ liệu tracking từ Data Lake, xử lý aggregation (clicks, conversions, qualified, unqualified), sau đó load vào Data Warehouse để phân tích và visualize.
+
+## 🏗 Kiến trúc hệ thống
+
+- **Data Lake**: MongoDB (NoSQL)
+- **Processing Engine**: PySpark (Local Mode)
+- **Data Warehouse**: MySQL
+- **Visualization**: Grafana
+- **Orchestration**: Docker Compose
+- **Scheduling**: Cron job (chạy mỗi 4-5 phút)
+
+##  Công nghệ sử dụng
+
+| Layer              | Technology                  |
+|--------------------|-----------------------------|
+| Data Lake          | MongoDB 7.0                 |
+| ETL Engine         | PySpark 3.5.4 (Local Mode)  |
+| Data Warehouse     | MySQL 8.0                   |
+| Visualization      | Grafana                     |
+| Container          | Docker Compose              |
+| Scheduling         | Linux Cron                  |
+
+##  Cấu trúc thư mục
+
+## 🛠 Cách chạy dự án
+
+### 1. Khởi động hệ thống
 
 ```bash
-cat > ~/recruitment-pipeline/README.md << 'EOF'
-# Recruitment Pipeline
-
-ETL pipeline xử lý logs tuyển dụng từ MongoDB (Data Lake) vào MySQL (Data Warehouse) bằng PySpark, tính toán các chỉ số `click`, `conversion`, `qualified`, `unqualified` theo giờ và ngày. Hỗ trợ near real‑time, visualization bằng Grafana.
-
-## Sơ đồ kiến trúc
-
-```
-[MongoDB] --(Spark read)--> [PySpark ETL] --(JDBC)--> [MySQL] --> [Grafana]
-   ^                              |                          ^
-   |                       (aggregate by date, hour)        |
-   |                                                        |
-   +-- [Fake data generator (cron 1')]                      +-- (dashboard query)
+docker compose up -d
 ```
 
-## Thành phần
-
-| Service    | Công nghệ           | Cổng     |
-|------------|---------------------|----------|
-| Data Lake  | MongoDB 7.0         | 27017    |
-| Data Warehouse | MySQL 8.0        | 3306     |
-| ETL Engine | PySpark 3.5.4 (container) | 8080 |
-| Visualization | Grafana          | 3000     |
-
-## Yêu cầu
-
-- Docker & Docker Compose
-- Git
-
-## Cài đặt nhanh
+### 2. Chạy Fake Data (Near Realtime)
 
 ```bash
-git clone https://github.com/thnguyendinh/recruitment-pipeline.git
-cd recruitment-pipeline
-docker-compose up -d
+docker exec spark bash -c "cd /opt/spark/scripts && nohup python3 fake_data.py > /var/log/fake_data.log 2>&1 &"
 ```
 
-Tạo bảng `events` trong MySQL:
-
-```bash
-docker exec mysql mysql -uroot -pexample warehouse -e "
-CREATE TABLE IF NOT EXISTS events (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    date DATE,
-    hour INT,
-    job_id INT,
-    campaign_id INT,
-    publisher_id INT,
-    group_id INT,
-    clicks INT DEFAULT 0,
-    conversions INT DEFAULT 0,
-    qualified INT DEFAULT 0,
-    disqualified INT DEFAULT 0,
-    bid_set DOUBLE,
-    spend_hour DOUBLE,
-    sources VARCHAR(50),
-    load_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-"
-```
-
-Tải JAR connector:
+### 3. Chạy ETL thủ công
 
 ```bash
 docker exec spark bash -c "
-mkdir -p /opt/spark/extra-jars && cd /opt/spark/extra-jars
-curl -O https://repo1.maven.org/maven2/org/mongodb/spark/mongo-spark-connector_2.12/10.4.0/mongo-spark-connector_2.12-10.4.0.jar
-curl -O https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.30/mysql-connector-j-8.0.30.jar
+cd /opt/spark && 
+export JAVA_HOME=/opt/java/openjdk && 
+python3 scripts/etl.py
 "
 ```
 
-## Chạy ETL thủ công
+### 4. Thiết lập Cron Job
 
 ```bash
-docker exec spark bash -c "export JAVA_HOME=/opt/java/openjdk && export SPARK_HOME=/opt/spark && cd /opt/spark && python3 /opt/spark/scripts/etl.py"
+crontab -l
 ```
 
-## Near real‑time (cron)
+##  Dashboard Grafana
 
-- Fake data mỗi 1 phút: `* * * * * /home/ubuntu/recruitment-pipeline/fake_data_batch.sh`
-- ETL mỗi 2 phút: `*/2 * * * * /home/ubuntu/recruitment-pipeline/scripts/run_etl.sh`
+Truy cập: `http://<EC2_IP>:3000`  
+- User/Pass: `admin` / `admin`
+- Data Source: MySQL (`mysql:3306`, database `warehouse`)
 
-Xem log: `tail -f /var/log/etl.log`
+##  Các Metrics chính
 
-## Grafana
+- Số clicks, conversions, qualified, disqualified theo ngày/giờ
+- Top Job ID có tương tác cao
+- Chi phí (bid/spend) theo campaign
 
-1. Truy cập `http://<EC2_IP>:3000` (admin/admin)
-2. Add data source MySQL: host `mysql:3306`, DB `warehouse`, user `root`, pass `example`
-3. Tạo dashboard với query:
+##  Tính năng Near Real-time
 
-```sql
-SELECT date, SUM(clicks) as clicks, SUM(spend_hour) as spend
-FROM events GROUP BY date ORDER BY date;
+- Fake data generator tạo records mới **mỗi 60 giây**
+- ETL job chạy **mỗi 4 phút**
+- Dữ liệu được aggregate và load liên tục vào MySQL
 
-cd ~/recruitment-pipeline
-git add README.md
-git commit -m "Add concise professional README with architecture diagram"
-git push origin main
-```
+---
